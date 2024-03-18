@@ -1,0 +1,206 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>IO及reactor模型 | Li's Home</title><meta name="author" content="Li Cong"><meta name="copyright" content="Li Cong"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="先介绍一下阻塞，非阻塞，同步，异步这四个概念。 概念陈硕大神原话：在处理 IO 的时候，阻塞和非阻塞都是同步 IO。只有使用了特殊的 API 才是异步 IO。 IO操作分为两个阶段：  数据准备 数据读写因为用户空间是不能直接操作硬件的，因此应用程序都要向内核空间读写数据。    一个典型的网络IO接口调用，分为两个阶段，分别是“数据就绪”和“数据读写”，数据就绪阶段分为阻塞和非阻塞，表现得结果就">
+<meta property="og:type" content="article">
+<meta property="og:title" content="IO及reactor模型">
+<meta property="og:url" content="https://liconghome.xyz/2024/03/18/IO%E5%8F%8Areactor%E6%A8%A1%E5%9E%8B/index.html">
+<meta property="og:site_name" content="Li&#39;s Home">
+<meta property="og:description" content="先介绍一下阻塞，非阻塞，同步，异步这四个概念。 概念陈硕大神原话：在处理 IO 的时候，阻塞和非阻塞都是同步 IO。只有使用了特殊的 API 才是异步 IO。 IO操作分为两个阶段：  数据准备 数据读写因为用户空间是不能直接操作硬件的，因此应用程序都要向内核空间读写数据。    一个典型的网络IO接口调用，分为两个阶段，分别是“数据就绪”和“数据读写”，数据就绪阶段分为阻塞和非阻塞，表现得结果就">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://s2.loli.net/2024/03/18/WGo2w7ngrs1lFAQ.jpg">
+<meta property="article:published_time" content="2024-03-18T12:35:41.024Z">
+<meta property="article:modified_time" content="2024-03-18T12:47:19.024Z">
+<meta property="article:author" content="Li Cong">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://s2.loli.net/2024/03/18/WGo2w7ngrs1lFAQ.jpg"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://liconghome.xyz/2024/03/18/IO%E5%8F%8Areactor%E6%A8%A1%E5%9E%8B/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=4.13.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/node-snackbar@0.1.16/dist/snackbar.min.css" media="print" onload="this.media='all'"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: {"path":"/search.xml","preload":false,"top_n_per_article":1,"unescape":false,"languages":{"hits_empty":"找不到您查询的内容：${query}","hits_stats":"共找到 ${hits} 篇文章"}},
+  translate: {"defaultEncoding":2,"translateDelay":0,"msgToTraditionalChinese":"繁","msgToSimplifiedChinese":"簡"},
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":230},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: {"chs_to_cht":"你已切换为繁体中文","cht_to_chs":"你已切换为简体中文","day_to_night":"你已切换为深色模式","night_to_day":"你已切换为浅色模式","bgLight":"#49b1f5","bgDark":"#1f1f1f","position":"bottom-left"},
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.11.1/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'IO及reactor模型',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2024-03-18 20:47:19'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 7.1.1"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="https://s2.loli.net/2024/03/18/WGo2w7ngrs1lFAQ.jpg" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><hr class="custom-hr"/><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page group" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 列表</span><i class="fas fa-chevron-down"></i></a><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="/movies/"><i class="fa-fw fas fa-video"></i><span> 电影</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header" style="background-image: url('https://cdn.pixabay.com/photo/2024/02/22/22/37/mountain-8590965_1280.jpg')"><nav id="nav"><span id="blog-info"><a href="/" title="Li's Home"><span class="site-name">Li's Home</span></a></span><div id="menus"><div id="search-button"><a class="site-page social-icon search" href="javascript:void(0);"><i class="fas fa-search fa-fw"></i><span> 搜索</span></a></div><div class="menus_items"><div class="menus_item"><a class="site-page" href="/"><i class="fa-fw fas fa-home"></i><span> 首页</span></a></div><div class="menus_item"><a class="site-page" href="/archives/"><i class="fa-fw fas fa-archive"></i><span> 归档</span></a></div><div class="menus_item"><a class="site-page" href="/tags/"><i class="fa-fw fas fa-tags"></i><span> 标签</span></a></div><div class="menus_item"><a class="site-page" href="/categories/"><i class="fa-fw fas fa-folder-open"></i><span> 分类</span></a></div><div class="menus_item"><a class="site-page group" href="javascript:void(0);"><i class="fa-fw fas fa-list"></i><span> 列表</span><i class="fas fa-chevron-down"></i></a><ul class="menus_item_child"><li><a class="site-page child" href="/music/"><i class="fa-fw fas fa-music"></i><span> 音乐</span></a></li><li><a class="site-page child" href="/movies/"><i class="fa-fw fas fa-video"></i><span> 电影</span></a></li></ul></div><div class="menus_item"><a class="site-page" href="/link/"><i class="fa-fw fas fa-link"></i><span> 友链</span></a></div><div class="menus_item"><a class="site-page" href="/about/"><i class="fa-fw fas fa-heart"></i><span> 关于</span></a></div></div><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">IO及reactor模型</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2024-03-18T12:35:41.024Z" title="发表于 2024-03-18 20:35:41">2024-03-18</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2024-03-18T12:47:19.024Z" title="更新于 2024-03-18 20:47:19">2024-03-18</time></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-wordcount"><i class="far fa-file-word fa-fw post-meta-icon"></i><span class="post-meta-label">字数总计:</span><span class="word-count">2.2k</span><span class="post-meta-separator">|</span><i class="far fa-clock fa-fw post-meta-icon"></i><span class="post-meta-label">阅读时长:</span><span>7分钟</span></span><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="IO及reactor模型"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><p>先介绍一下阻塞，非阻塞，同步，异步这四个概念。</p>
+<h1 id="概念"><a href="#概念" class="headerlink" title="概念"></a>概念</h1><p>陈硕大神原话：<strong>在处理 IO 的时候，阻塞和非阻塞都是同步 IO。只有使用了特殊的 API 才是异步 IO。</strong></p>
+<p>IO操作分为两个阶段：</p>
+<ol>
+<li>数据准备</li>
+<li>数据读写<br>因为用户空间是不能直接操作硬件的，因此应用程序都要向内核空间读写数据。</li>
+</ol>
+<p><img src="https://pic3.zhimg.com/v2-89162cb4d5cc7fe4071ade36d3000d8a_r.jpg" alt="流程.jpg"></p>
+<blockquote>
+<p>一个典型的网络IO接口调用，分为两个阶段，分别是“数据就绪”和“数据读写”，数据就绪阶段分为阻塞和非阻塞，表现得结果就是，阻塞当前线程或是直接返回。 同步表示A向B请求调用一个网络IO接口时（或者调用某个业务逻辑API接口时），数据的读写都是由请求方A自己来完成的（不管是阻塞还是非阻塞）；异步表示A向B请求调用一个网络IO接口 时（或者调用某个业务逻辑API接口时），向B传入请求的事件以及事件发生时通知的方式，A就可以处理其它逻辑了，当B监听到事件处理完成后，会用事先约定好的通知方式，通知A处理结果。</p>
+</blockquote>
+<p><img src="https://s2.loli.net/2024/03/18/vSwsRidmb2qWJaN.png" alt="io.png"></p>
+<h2 id="阻塞和非阻塞"><a href="#阻塞和非阻塞" class="headerlink" title="阻塞和非阻塞"></a>阻塞和非阻塞</h2><p>以一个recv函数读数据为例：<br>recv接收来自socket缓冲区的数据，当缓冲区没有数据可取时，recv会一直处于阻塞状态()，直到缓冲区至少又一个字节数据可读取，或者对端关闭，并读取所有数据后返回.</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">recv</span><span class="params">(<span class="type">int</span> sockfd, <span class="type">char</span> * buf, <span class="type">int</span> len, <span class="type">int</span> flags)</span></span>;</span><br><span class="line"></span><br><span class="line">sockfd：连接的fd</span><br><span class="line"></span><br><span class="line">buf：用于接收数据的缓冲区</span><br><span class="line"></span><br><span class="line">len：缓冲区长度</span><br><span class="line"></span><br><span class="line">flags：指定调用方式</span><br></pre></td></tr></table></figure>
+<p>也就是说数据一直没准备好就会一直<strong>阻塞</strong>。<br>flags置为<code>MSG_DONTWAIT</code>则是<strong>非阻塞</strong>，不管有没有数据都会返回。非阻塞既然会立刻返回，那么一般用的时候都会加入循环，也就是隔一段时间去试试有没有接收到数据。</p>
+<h2 id="同步和异步"><a href="#同步和异步" class="headerlink" title="同步和异步"></a>同步和异步</h2><p>阻塞和非阻塞其实都是发生在数据准备阶段，不管哪个方式，当我们读数据到自定义的buf中时，一定是我们自己在从内核空间往用户空间的buf中写数据。<br>而同步和异步的关键在于数据读写：异步接口会直接把buf给你写好返回给你（内核空间处理），关键在于你们直接要约定一个通知方式，当这个buf写好了要通知到你（信号，回调函数），因为你在执行这个接口后不会阻塞，只有当通知你是你再去处理。<br>在工作中也会讲同步异步不一定是IO操作但是思想是类似的，同步，就是调用某个东西是，调用方得等待这个调用返回结果才能继续往后执行。异步，和同步相反  调用方不会理解得到结果，而是在调用发出后调用者可用继续执行后续操作，被调用者通过状体来通知调用者，或者通过回掉函数来处理这个调用。</p>
+<h1 id="Linux的五种IO模型"><a href="#Linux的五种IO模型" class="headerlink" title="Linux的五种IO模型"></a>Linux的五种IO模型</h1><h2 id="阻塞（blocking）"><a href="#阻塞（blocking）" class="headerlink" title="阻塞（blocking）"></a>阻塞（blocking）</h2><p><img src="https://s2.loli.net/2024/03/18/sgzvGSACIpnOYXa.png" alt="阻塞.png"></p>
+<h2 id="非阻塞（non-blocking）"><a href="#非阻塞（non-blocking）" class="headerlink" title="非阻塞（non-blocking）"></a>非阻塞（non-blocking）</h2><p><strong>如果你连续做read操作而没有数据可读，此时程序不会阻塞起来等待数据准备就绪返回，read函数会返回一个错误EAGAIN</strong>，提示你的应用程序现在没有数据可读请稍后再试。<br><img src="https://s2.loli.net/2024/03/18/uycY4x6pJiLjUEA.png" alt="非阻塞.png"></p>
+<h2 id="IO复用（IO-multiplexing）"><a href="#IO复用（IO-multiplexing）" class="headerlink" title="IO复用（IO multiplexing）"></a>IO复用（IO multiplexing）</h2><p><a href="./IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8.md">详细了解IO多路复用点此</a><br><img src="https://s2.loli.net/2024/03/18/BZoCxGr31OXu8HY.png" alt="io复用.png"></p>
+<h2 id="信号驱动（signal-driven）"><a href="#信号驱动（signal-driven）" class="headerlink" title="信号驱动（signal-driven）"></a>信号驱动（signal-driven）</h2><p><img src="https://s2.loli.net/2024/03/18/MgTKXYrWklVPfFo.png" alt="信号驱动.png"></p>
+<p>内核在第一个阶段是异步，在第二个阶段是同步；与非阻塞IO的区别在于它提供了消息通知机制，不需 要用户进程不断的轮询检查，减少了系统API的调用次数，提高了效率。<br>简单来说数据准备好了告诉你，读写还是要自己操作。</p>
+<h2 id="异步（asynchronous）"><a href="#异步（asynchronous）" class="headerlink" title="异步（asynchronous）"></a>异步（asynchronous）</h2><p><img src="https://s2.loli.net/2024/03/18/U4ytm5TKpZ7uA6L.png" alt="异步.png"></p>
+<h1 id="网络服务器设计理念"><a href="#网络服务器设计理念" class="headerlink" title="网络服务器设计理念"></a>网络服务器设计理念</h1><p>在这个多核时代，服务端网络编程如何选择线程模型呢？ 赞同libev作者的观点：one loop per thread is usually a good model，这样多线程服务端编程的问题就转换为如何设计一个高效且易于使用的event loop，然后每个线程run一个event loop就行了（当然线程间的同步、互斥少不了，还有其 它的耗时事件需要起另外的线程来做）。<br>event loop 是 non-blocking 网络编程的核心，在现实生活中，non-blocking 几乎总是和 IO-multiplexing 一起使用，原因有两点：  </p>
+<ul>
+<li>没有人真的会用轮询 (busy-pooling) 来检查某个 non-blocking IO 操作是否完成，这样太浪费 CPU资源了。</li>
+<li>IO-multiplex 一般不能和 blocking IO 用在一起，因为 blocking IO 中 read()&#x2F;write()&#x2F;accept()&#x2F;connect() 都有可能阻塞当前线程，这样线程就没办法处理其他 socket 上的 IO 事件了。</li>
+</ul>
+<p>所以，当我们提到 non-blocking 的时候，实际上指的是 non-blocking + IO-multiplexing，单用其 中任何一个都没有办法很好的实现功能。</p>
+<h1 id="Reactor模型"><a href="#Reactor模型" class="headerlink" title="Reactor模型"></a>Reactor模型</h1><blockquote>
+<p>The reactor design pattern is an event handling pattern for handling service requests<br>delivered concurrently to a service handler by one or more inputs. The service handler<br>then demultiplexes the incoming requests and dispatches them synchronously to the<br>associated request handlers.</p>
+</blockquote>
+<p>重要组件：<strong>Event事件、Reactor反应堆、Demultiplex事件分发器、Evanthandler事件处理器</strong></p>
+<p><img src="https://s2.loli.net/2024/03/18/5PvmXVR1FdQnqE2.png" alt="reactor.png"></p>
+<ul>
+<li>Event：事件的sockfd，事件类型（EPOLL_IN、EPOLL_OUT…）</li>
+<li>Reactor：维护事件event以及事件处理EventHandler的集合</li>
+<li>Demultiplex：多路复用分发器，监听sockfd上相应的事件，有事件发生的时候把事件列表返回给Reactor</li>
+<li>EventHandler： 读取用户事件的请求read，反序列化，业务逻辑处理计算，对处理的结果序列化，send给用户返回一个响应</li>
+</ul>
+<p>在整个基于Reactor模型的网络服务交互阶段，首先我们把事件注册到反应堆上，也就是说，应用程序对这个事件感兴趣，请求反应堆帮忙来监听它所感兴趣的事件，并且在这个事件发生的时候调用相应预置的回调Handler</p>
+<p>向反应堆注册事件，<strong>就是把这个事件event和对应的事件处理器EventHandler（一个event对应一个EventHandler）都给到reactor反应堆</strong>。反应堆存储着事件event以及事件处理的集合，可以添加更多选项，比如说事件添加的时间，事件响应的时间等等</p>
+<p>reactor反应堆维护了事件event以及事件处理的集合，底层会通过epoll_ctl进行设置事件，调整事件，添加新的事件，修改已有事件，删除已有事件。然后启动反应堆，反应堆就会驱动事件分发器的启动，开启多路复用，实际上就是开启epoll_wait，然后服务器监听新用户的连接，或是已连接用户的读写事件</p>
+<p>如果epoll_wait有监听到新的事件的产生，那么多路复用分发器Demultiplex就会把这个分发的事件给反应堆返回，因为事件发生了，reactor模型就要调用事件的处理器EventHandler，而这个EventHandler是注册在reactor反应堆的。反应堆收到多路复用分发器返回的事件后，reactor就会找到并调用event对应的EventHandler（一般用map表）处理事件。一般来说处理事件要么是建立连接，要么是读取数据处理并返回，需要进行数据的序列化和反序列化。</p>
+<p><strong>muduo网络库使用的Multiple Reactors模型</strong><br><img src="https://img-blog.csdnimg.cn/933d7774592848c1bb629d6c96060de2.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBAQnVnTWFrZXItc2hlbg==,size_20,color_FFFFFF,t_70,g_se,x_16" alt="reactor"></p>
+<p>图中反应堆mainReactor和subReactor，实际上都是代表着我们上面说的Reactor和Demultiplex事件分发器，由他们监听具体事件的发生，维护事件event以及事件处理EventHandler的集合，调用相应的回调处理函数</p>
+<p>多路事件分发器执行的就是epoll_wait，进行事件循环监听。对于经典的网络I&#x2F;O模型，一般使用多线程循环监听，比如我们使用一个线程专门循环监听新用户的连接，多个线程循环监听已连接用户的读写事件，如果再有其他耗时的操作，比如说传输文件，就再起一个线程去处理这些操作</p>
+<p><img src="https://img-blog.csdnimg.cn/d979bc6a518d44deb7790f6da368fd2e.png?x-oss-process=image/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBAQnVnTWFrZXItc2hlbg==,size_20,color_FFFFFF,t_70,g_se,x_16" alt="reactorpoll"></p>
+<p>muduo的特点是one loop per thread，有一个main reactor负载accept连接，然后把连接分发到某个sub reactor（采用<a target="_blank" rel="noopener" href="https://blog.csdn.net/pzw_0612/article/details/47357221?spm=1001.2101.3001.6650.1&utm_medium=distribute.pc_relevant.none-task-blog-2~default~BlogCommendFromBaidu~Rate-1-47357221-blog-90265243.235%5Ev43%5Epc_blog_bottom_relevance_base8&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2~default~BlogCommendFromBaidu~Rate-1-47357221-blog-90265243.235%5Ev43%5Epc_blog_bottom_relevance_base8&utm_relevant_index=2">round-robin</a>的方式来选择sub reactor），该连接的所有操作都在sub reactor所处的线程中完成。多个连接可能被分派到多个线程中，以充分列用CPU</p>
+<p>Reactor Pool的线程数量是固定的，与CPU的核心数有关</p>
+<p>如果有过多的耗时操作，可以提交到创建的ThreadPool中完成</p>
+<p>转载：<br><a target="_blank" rel="noopener" href="https://blog.csdn.net/qq_42500831/article/details/124118564">https://blog.csdn.net/qq_42500831/article/details/124118564</a></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://liconghome.xyz">Li Cong</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://liconghome.xyz/2024/03/18/IO%E5%8F%8Areactor%E6%A8%A1%E5%9E%8B/">https://liconghome.xyz/2024/03/18/IO%E5%8F%8Areactor%E6%A8%A1%E5%9E%8B/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://liconghome.xyz" target="_blank">Li's Home</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"></div><div class="post_share"><div class="social-share" data-image="https://s2.loli.net/2024/03/18/WGo2w7ngrs1lFAQ.jpg" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="next-post pull-full"><a href="/2024/03/18/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/" title="IO多路复用"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">IO多路复用</div></div></a></div></nav></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="https://s2.loli.net/2024/03/18/WGo2w7ngrs1lFAQ.jpg" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">Li Cong</div><div class="author-info__description"></div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">5</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">2</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons is-center"><a class="social-icon" href="https://github.com/LiCong-22" target="_blank" title="Github"><i class="fab fa-github" style="color: #24292e;"></i></a><a class="social-icon" href="mailto:licong0797@126.com" target="_blank" title="Email"><i class="fas fa-envelope" style="color: #4a7dbe;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E6%A6%82%E5%BF%B5"><span class="toc-number">1.</span> <span class="toc-text">概念</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%BB%E5%A1%9E%E5%92%8C%E9%9D%9E%E9%98%BB%E5%A1%9E"><span class="toc-number">1.1.</span> <span class="toc-text">阻塞和非阻塞</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%90%8C%E6%AD%A5%E5%92%8C%E5%BC%82%E6%AD%A5"><span class="toc-number">1.2.</span> <span class="toc-text">同步和异步</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Linux%E7%9A%84%E4%BA%94%E7%A7%8DIO%E6%A8%A1%E5%9E%8B"><span class="toc-number">2.</span> <span class="toc-text">Linux的五种IO模型</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%98%BB%E5%A1%9E%EF%BC%88blocking%EF%BC%89"><span class="toc-number">2.1.</span> <span class="toc-text">阻塞（blocking）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E9%9D%9E%E9%98%BB%E5%A1%9E%EF%BC%88non-blocking%EF%BC%89"><span class="toc-number">2.2.</span> <span class="toc-text">非阻塞（non-blocking）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#IO%E5%A4%8D%E7%94%A8%EF%BC%88IO-multiplexing%EF%BC%89"><span class="toc-number">2.3.</span> <span class="toc-text">IO复用（IO multiplexing）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BF%A1%E5%8F%B7%E9%A9%B1%E5%8A%A8%EF%BC%88signal-driven%EF%BC%89"><span class="toc-number">2.4.</span> <span class="toc-text">信号驱动（signal-driven）</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BC%82%E6%AD%A5%EF%BC%88asynchronous%EF%BC%89"><span class="toc-number">2.5.</span> <span class="toc-text">异步（asynchronous）</span></a></li></ol></li><li class="toc-item toc-level-1"><a class="toc-link" href="#%E7%BD%91%E7%BB%9C%E6%9C%8D%E5%8A%A1%E5%99%A8%E8%AE%BE%E8%AE%A1%E7%90%86%E5%BF%B5"><span class="toc-number">3.</span> <span class="toc-text">网络服务器设计理念</span></a></li><li class="toc-item toc-level-1"><a class="toc-link" href="#Reactor%E6%A8%A1%E5%9E%8B"><span class="toc-number">4.</span> <span class="toc-text">Reactor模型</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/03/18/IO%E5%8F%8Areactor%E6%A8%A1%E5%9E%8B/" title="IO及reactor模型">IO及reactor模型</a><time datetime="2024-03-18T12:35:41.024Z" title="发表于 2024-03-18 20:35:41">2024-03-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/03/18/IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/" title="IO多路复用">IO多路复用</a><time datetime="2024-03-18T12:33:53.557Z" title="发表于 2024-03-18 20:33:53">2024-03-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/03/17/hello-world/" title="Hello World">Hello World</a><time datetime="2024-03-17T12:28:00.000Z" title="发表于 2024-03-17 20:28:00">2024-03-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/03/17/%E5%9F%BA%E7%A1%80%E9%97%AE%E9%A2%98/" title="编程学习">编程学习</a><time datetime="2024-03-17T12:12:30.000Z" title="发表于 2024-03-17 20:12:30">2024-03-17</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/03/17/%E7%BB%9F%E4%B8%80%E8%AF%8A%E6%96%AD%E6%9C%8D%E5%8A%A1%EF%BC%88UDS%EF%BC%89/" title="统一诊断服务（UDS）">统一诊断服务（UDS）</a><time datetime="2024-03-17T12:11:42.000Z" title="发表于 2024-03-17 20:11:42">2024-03-17</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2024 By Li Cong</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="translateLink" type="button" title="简繁转换">繁</button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=4.13.0"></script><script src="/js/main.js?v=4.13.0"></script><script src="/js/tw_cn.js?v=4.13.0"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.umd.min.js"></script><script src="https://cdn.jsdelivr.net/npm/instant.page@5.2.0/instantpage.min.js" type="module"></script><script src="https://cdn.jsdelivr.net/npm/node-snackbar@0.1.16/dist/snackbar.min.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script><div id="local-search"><div class="search-dialog"><nav class="search-nav"><span class="search-dialog-title">搜索</span><span id="loading-status"></span><button class="search-close-button"><i class="fas fa-times"></i></button></nav><div class="is-center" id="loading-database"><i class="fas fa-spinner fa-pulse"></i><span>  数据库加载中</span></div><div class="search-wrap"><div id="local-search-input"><div class="local-search-box"><input class="local-search-box--input" placeholder="搜索文章" type="text"/></div></div><hr/><div id="local-search-results"></div><div id="local-search-stats-wrap"></div></div></div><div id="search-mask"></div><script src="/js/search/local-search.js?v=4.13.0"></script></div></div></body></html>
